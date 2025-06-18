@@ -43,16 +43,60 @@ with open("data/tiny_shakespeare.txt", "r") as f:
     text = f.read()
 
 dataset = CharDataset(tokenizer, text, config["block_size"])
-dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+batch_size = config.get("batch_size", 64)
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # --- 建立模型與訓練元件 ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = MiniDecoder(**config).to(device)
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+model = MiniDecoder(
+    embed_dim=config["embed_dim"],
+    num_heads=config["num_heads"],
+    block_size=config["block_size"],
+    num_layers=config["num_layers"],
+    vocab_size=config["vocab_size"]
+).to(device)
+learning_rate = config.get("learning_rate", 1e-3)
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 criterion = nn.CrossEntropyLoss()
 
+# --- 設定 Learning Rate Scheduler（由 config 控制） ---
+scheduler_config = config.get("scheduler", {})
+scheduler_type = scheduler_config.get("type", None)
+scheduler = None
+
+if scheduler_type == "step":
+    from torch.optim.lr_scheduler import StepLR
+    step_size = scheduler_config.get("step_size", 2)
+    gamma = scheduler_config.get("gamma", 0.5)
+    scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+elif scheduler_type == "cosine":
+    from torch.optim.lr_scheduler import CosineAnnealingLR
+    T_max = scheduler_config.get("T_max", config.get("epochs", 5))
+    scheduler = CosineAnnealingLR(optimizer, T_max=T_max)
+elif scheduler_type == "plateau":
+    from torch.optim.lr_scheduler import ReduceLROnPlateau
+    factor = scheduler_config.get("factor", 0.1)
+    patience = scheduler_config.get("patience", 2)
+    scheduler = ReduceLROnPlateau(optimizer, factor=factor, patience=patience)
+
+# 可選 scheduler 設定樣板：
+# "scheduler": {
+#   "type": "step",
+#   "step_size": 2,
+#   "gamma": 0.5
+# }
+# "scheduler": {
+#   "type": "cosine",
+#   "T_max": 10
+# }
+# "scheduler": {
+#   "type": "plateau",
+#   "factor": 0.5,
+#   "patience": 2
+# }
+
 # --- 訓練迴圈 ---
-epochs = 10
+epochs = config.get("epochs", 5)
 model.train()
 for epoch in range(epochs):
     total_loss = 0
@@ -70,6 +114,11 @@ for epoch in range(epochs):
     avg_loss = total_loss / len(dataloader)
     print(f"Epoch {epoch+1} completed, Avg Loss: {avg_loss:.4f}")
 
+    if scheduler_type == "plateau":
+        scheduler.step(avg_loss)
+    elif scheduler:
+        scheduler.step()
+
 # --- 自動產生時間戳檔名 ---
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 model_path = f"checkpoints/decoder_model_bpe_{ts}.pt"
@@ -80,3 +129,6 @@ torch.save(model.state_dict(), model_path)
 tokenizer.tokenizer.save(tokenizer_out_path)
 print(f"\n✅ 模型儲存完成：{model_path}")
 print(f"✅ Tokenizer 儲存完成：{tokenizer_out_path}")
+
+# --- 若需要推送到 GitHub，請於 Colab notebook 內執行 ---
+# push 指令請獨立寫於 notebook 內以提高控制彈性與安全性

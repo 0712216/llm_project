@@ -1,6 +1,14 @@
 {
-  "embed_dim": 256,
-  "num_heads": 8,
+  "embed_dim": 128,
+  "num_heads": 4,
   "block_size": 64,
-  "num_layers": 2
+  "num_layers": 2,
+  "epochs": 10,
+  "learning_rate": 0.001,
+  "batch_size": 64,
+  "scheduler": {
+    "type": "cosine",
+    "T_max": 10
+  },
+  "vocab_size": 5000
 }
