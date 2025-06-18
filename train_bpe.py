@@ -13,7 +13,7 @@ from tokenizer.bpe_tokenizer import BPETokenizer
 tokenizer_path = "checkpoints/bpe_tokenizer.json"
 if not os.path.exists(tokenizer_path):
     print("Tokenizer not found. Training BPE tokenizer...")
-    BPETokenizer.train_from_text(["tiny_shakespeare.txt"], tokenizer_path=tokenizer_path)
+    BPETokenizer.train_from_text(["data/tiny_shakespeare.txt"], tokenizer_path=tokenizer_path)
 
 # --- 載入 tokenizer ---
 tokenizer = BPETokenizer(tokenizer_path)
