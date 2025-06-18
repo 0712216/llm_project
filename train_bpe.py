@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import os
 import json
 from datetime import datetime
+from tqdm import tqdm
 from dataset import CharDataset
 from model.decoder import MiniDecoder
 from tokenizer.bpe_tokenizer import BPETokenizer
@@ -51,11 +52,12 @@ optimizer = optim.Adam(model.parameters(), lr=1e-3)
 criterion = nn.CrossEntropyLoss()
 
 # --- 訓練迴圈 ---
-epochs = 5
+epochs = 10
 model.train()
 for epoch in range(epochs):
     total_loss = 0
-    for x, y in dataloader:
+    loop = tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}")
+    for x, y in loop:
         x, y = x.to(device), y.to(device)
         logits = model(x)
         loss = criterion(logits.view(-1, logits.size(-1)), y.view(-1))
@@ -63,9 +65,10 @@ for epoch in range(epochs):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+        loop.set_postfix(loss=loss.item())
 
     avg_loss = total_loss / len(dataloader)
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
+    print(f"Epoch {epoch+1} completed, Avg Loss: {avg_loss:.4f}")
 
 # --- 自動產生時間戳檔名 ---
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
